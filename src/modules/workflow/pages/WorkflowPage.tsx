@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BookOpen, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import NodeSidebar from "../components/sidebar/NodeSidebar";
 import WorkflowCanvas from "../components/canvas/WorkflowCanvas";
 import PropertiesPanel from "../components/panel/PropertiesPanel";
