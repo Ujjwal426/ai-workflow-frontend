@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 import {
   AlertCircle,
   CalendarClock,
@@ -86,7 +87,11 @@ const WorkflowDashboard = () => {
       void queryClient.invalidateQueries({ queryKey: workflowQueryKeys.all });
       form.reset();
       setIsCreateOpen(false);
+      toast.success("Workflow created successfully");
       navigate(`/workflows/${workflow.id}`);
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Failed to create workflow");
     },
   });
   const deleteMutation = useMutation({
@@ -94,6 +99,10 @@ const WorkflowDashboard = () => {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: workflowQueryKeys.all });
       setWorkflowToDelete(null);
+      toast.success("Workflow deleted successfully");
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Failed to delete workflow");
     },
   });
 

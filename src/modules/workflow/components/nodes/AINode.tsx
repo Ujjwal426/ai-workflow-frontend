@@ -2,8 +2,12 @@ import type { NodeProps } from "reactflow";
 
 import type { WorkflowNodeData } from "../../types/workflow.types";
 import BaseNode from "./BaseNode";
+import { useExecutionStore } from "../../../execution/store/executionStore";
 
-const AINode = ({ data, selected }: NodeProps<WorkflowNodeData>) => {
+const AINode = ({ data, selected, id }: NodeProps<WorkflowNodeData>) => {
+  const nodeStates = useExecutionStore((state) => state.nodeStates);
+  const executionStatus = nodeStates[id || ""]?.status || "idle";
+
   return (
     <BaseNode
       title={data.title}
@@ -12,6 +16,7 @@ const AINode = ({ data, selected }: NodeProps<WorkflowNodeData>) => {
       config={data.config}
       color="bg-violet-500"
       selected={selected}
+      executionStatus={executionStatus}
     />
   );
 };

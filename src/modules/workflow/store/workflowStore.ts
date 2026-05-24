@@ -16,6 +16,7 @@ import type {
   WorkflowNodeData,
   WorkflowSnapshot,
   WorkflowNodeType,
+  WorkflowValidation,
 } from "../types/workflow.types";
 
 const STORAGE_KEY = "ai-workflow-builder.workflow";
@@ -50,6 +51,18 @@ const isConnectionAllowed = (
 
 const createNodeData = (type: WorkflowNodeType): WorkflowNodeData => {
   const labels: Record<WorkflowNodeType, WorkflowNodeData> = {
+    startNode: {
+      title: "Start",
+      description: "Workflow entry point.",
+      status: "idle",
+      config: {},
+    },
+    endNode: {
+      title: "End",
+      description: "Workflow completion point.",
+      status: "idle",
+      config: {},
+    },
     aiNode: {
       title: "AI Node",
       description: "Use a model to transform or generate content.",
@@ -97,9 +110,9 @@ const defaultSnapshot: WorkflowSnapshot = {
   nodes: [
     {
       id: "node-1",
-      type: "aiNode",
+      type: "startNode",
       position: { x: 280, y: 120 },
-      data: createNodeData("aiNode"),
+      data: createNodeData("startNode"),
     },
   ],
   edges: [],
@@ -150,6 +163,10 @@ interface WorkflowState {
   copiedNode: WorkflowNode | null;
   past: WorkflowSnapshot[];
   future: WorkflowSnapshot[];
+  executionId: string | null;
+  executionStatus: "idle" | "running" | "completed" | "failed" | "cancelled";
+  validation: WorkflowValidation | null;
+  isValid: boolean;
 
   addNode: (type: WorkflowNodeType, position: WorkflowNode["position"]) => void;
   onNodesChange: (changes: NodeChange[]) => void;
@@ -175,7 +192,14 @@ interface WorkflowState {
   exportWorkflow: () => string;
   importWorkflow: (workflow: WorkflowSnapshot) => void;
   resetWorkflow: () => void;
-  validateWorkflow: () => string[];
+  loadAIGeneratedWorkflow: (nodes: WorkflowNode[], edges: WorkflowEdge[]) => void;
+  startExecution: (executionId: string) => void;
+  updateNodeStatus: (nodeId: string, status: "idle" | "loading" | "success" | "error") => void;
+  setExecutionStatus: (status: "idle" | "running" | "completed" | "failed" | "cancelled") => void;
+  cancelExecution: () => void;
+  resetExecutionState: () => void;
+  setValidation: (validation: WorkflowValidation) => void;
+  validateWorkflow: () => WorkflowValidation;
 }
 
 export const useWorkflowStore = create<WorkflowState>((set, get) => ({
@@ -185,6 +209,10 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   copiedNode: null,
   past: [],
   future: [],
+  executionId: null,
+  executionStatus: "idle",
+  validation: null,
+  isValid: false,
 
   addNode: (type, position) =>
     set((state) => {
@@ -434,20 +462,22 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   autoLayout: () =>
     set((state) => {
       const typeOrder: Record<string, number> = {
-        webhookNode: 0,
-        aiNode: 1,
-        httpNode: 2,
-        delayNode: 3,
+        startNode: 0,
+        webhookNode: 1,
+        aiNode: 2,
+        httpNode: 3,
+        delayNode: 4,
+        endNode: 5,
       };
       const columns = new Map<number, WorkflowNode[]>();
 
       state.nodes.forEach((node) => {
-        const column = typeOrder[node.type ?? ""] ?? 1;
+        const column = typeOrder[node.type ?? ""] ?? 2;
         columns.set(column, [...(columns.get(column) ?? []), node]);
       });
 
       const nodes = state.nodes.map((node) => {
-        const column = typeOrder[node.type ?? ""] ?? 1;
+        const column = typeOrder[node.type ?? ""] ?? 2;
         const row = columns.get(column)?.findIndex((item) => item.id === node.id) ?? 0;
 
         return {
@@ -542,17 +572,96 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       return nextState;
     }),
 
+  loadAIGeneratedWorkflow: (aiNodes, aiEdges) =>
+    set((state) => {
+      // Auto-layout nodes in a horizontal flow
+      const layoutNodes = aiNodes.map((node, index) => ({
+        ...node,
+        position: {
+          x: 100 + (index * 250), // Horizontal spacing
+          y: 150, // Vertical center
+        },
+        data: {
+          ...node.data,
+          status: "idle" as const, // Reset status with proper type
+        },
+      })) as WorkflowNode[];
+
+      const workflow = {
+        nodes: layoutNodes,
+        edges: aiEdges,
+      };
+
+      const nextState = {
+        nodes: layoutNodes,
+        edges: aiEdges,
+        selectedNode: null,
+        selectedEdge: null,
+        past: [...state.past, getSnapshot(state)],
+        future: [],
+      };
+
+      persistSnapshot(workflow);
+      return nextState;
+    }),
+
   validateWorkflow: () => {
     const { nodes, edges } = get();
     const errors: string[] = [];
-    const hasWebhook = nodes.some((node) => node.type === "webhookNode");
+    const warnings: string[] = [];
+    const hasStart = nodes.some((node) => node.type === "startNode");
+    const hasEnd = nodes.some((node) => node.type === "endNode");
 
     if (nodes.length === 0) {
       errors.push("Add at least one node.");
     }
 
-    if (!hasWebhook) {
-      errors.push("Add a webhook trigger node.");
+    if (!hasStart) {
+      errors.push("Add a Start node to begin the workflow.");
+    }
+
+    if (!hasEnd) {
+      errors.push("Add an End node to complete the workflow.");
+    }
+
+    if (hasStart && hasEnd && nodes.length < 3) {
+      warnings.push("Consider adding more nodes between Start and End for a meaningful workflow.");
+    }
+
+    // Check if all nodes are connected
+    const connectedNodeIds = new Set<string>();
+
+    if (hasStart) {
+      const startNode = nodes.find((n) => n.type === "startNode");
+      if (startNode) {
+        connectedNodeIds.add(startNode.id);
+        const traverse = (nodeId: string) => {
+          edges
+            .filter((e) => e.source === nodeId)
+            .forEach((edge) => {
+              if (!connectedNodeIds.has(edge.target)) {
+                connectedNodeIds.add(edge.target);
+                traverse(edge.target);
+              }
+            });
+        };
+        traverse(startNode.id);
+      }
+    }
+
+    const unconnectedNodes = nodes.filter((n) => !connectedNodeIds.has(n.id));
+    if (unconnectedNodes.length > 0) {
+      warnings.push(
+        `${unconnectedNodes.length} node(s) are not connected to the Start node: ${unconnectedNodes.map((n) => n.data.title).join(", ")}`,
+      );
+    }
+
+    // Check if End node is reachable from Start
+    if (hasStart && hasEnd) {
+      const endNode = nodes.find((n) => n.type === "endNode");
+      if (endNode && !connectedNodeIds.has(endNode.id)) {
+        errors.push("End node is not reachable from Start node. Please check your connections.");
+      }
     }
 
     nodes.forEach((node) => {
@@ -579,8 +688,56 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       if (!nodes.some((node) => node.id === edge.target)) {
         errors.push(`Edge ${edge.id} has a missing target.`);
       }
+
+      // Check for self-loops
+      if (edge.source === edge.target) {
+        errors.push(`Edge ${edge.id} creates a self-loop on node ${edge.source}.`);
+      }
     });
 
-    return errors;
+    return {
+      isValid: errors.length === 0,
+      errors: errors.length > 0 ? errors : undefined,
+      warnings: warnings.length > 0 ? warnings : undefined,
+    };
   },
+
+  setValidation: (validation) =>
+    set(() => ({
+      validation,
+      isValid: validation.isValid,
+    })),
+
+  startExecution: (executionId) =>
+    set(() => ({
+      executionId,
+      executionStatus: "running",
+    })),
+
+  updateNodeStatus: (nodeId, status) =>
+    set((state) => ({
+      nodes: state.nodes.map((node) =>
+        node.id === nodeId ? { ...node, data: { ...node.data, status } } : node,
+      ),
+    })),
+
+  setExecutionStatus: (status: "idle" | "running" | "completed" | "failed" | "cancelled") =>
+    set(() => ({
+      executionStatus: status,
+    })),
+
+  cancelExecution: () =>
+    set(() => ({
+      executionStatus: "cancelled",
+    })),
+
+  resetExecutionState: () =>
+    set((state) => ({
+      executionId: null,
+      executionStatus: "idle",
+      nodes: state.nodes.map((node) => ({
+        ...node,
+        data: { ...node.data, status: "idle" as const },
+      })),
+    })),
 }));

@@ -168,11 +168,11 @@ const PropertiesPanel = () => {
     clearSelection,
     validateWorkflow,
   } = useWorkflowStore();
-  const validationErrors = validateWorkflow();
+  const validationResult = validateWorkflow();
 
   if (selectedEdge) {
     return (
-      <aside className="w-80 overflow-y-auto border-l bg-white p-4">
+      <aside className="w-80 flex-shrink-0 overflow-y-auto border-l bg-white p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold">Edge Properties</h2>
@@ -213,7 +213,7 @@ const PropertiesPanel = () => {
 
   if (!selectedNode) {
     return (
-      <aside className="w-80 overflow-y-auto border-l bg-white p-4">
+      <aside className="w-80 flex-shrink-0 overflow-y-auto border-l bg-white p-4">
         <h2 className="text-lg font-semibold">Properties</h2>
         <p className="mt-2 text-sm leading-6 text-slate-500">
           Select a node or edge on the canvas to edit its details.
@@ -221,10 +221,10 @@ const PropertiesPanel = () => {
 
         <div className="mt-5 rounded-lg border bg-slate-50 p-3">
           <div className="text-sm font-medium text-slate-900">Validation</div>
-          {validationErrors.length > 0 ? (
+          {validationResult.errors && validationResult.errors.length > 0 ? (
             <ul className="mt-3 space-y-2 text-sm text-amber-700">
-              {validationErrors.map((error) => (
-                <li key={error}>{error}</li>
+              {validationResult.errors.map((error, index) => (
+                <li key={index}>{error}</li>
               ))}
             </ul>
           ) : (
@@ -243,7 +243,7 @@ const PropertiesPanel = () => {
   };
 
   return (
-    <aside className="w-80 overflow-y-auto border-l bg-white p-4">
+    <aside className="w-80 flex-shrink-0 overflow-y-auto border-l bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Node Properties</h2>

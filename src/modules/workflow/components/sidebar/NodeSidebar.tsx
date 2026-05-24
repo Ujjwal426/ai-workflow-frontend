@@ -1,10 +1,24 @@
 import type { DragEvent } from "react";
-import { Bot, Clock, GripVertical, Globe2, RadioTower, Search } from "lucide-react";
+import { Bot, Clock, GripVertical, Globe2, Play, RadioTower, Search, Square } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { WorkflowNodeType } from "../../types/workflow.types";
 
 const nodeItems = [
+  {
+    type: "startNode",
+    label: "Start Node",
+    description: "Workflow entry point.",
+    category: "Flow",
+    icon: Play,
+  },
+  {
+    type: "endNode",
+    label: "End Node",
+    description: "Workflow completion point.",
+    category: "Flow",
+    icon: Square,
+  },
   {
     type: "aiNode",
     label: "AI Node",
@@ -71,7 +85,7 @@ const NodeSidebar = () => {
   };
 
   return (
-    <aside className="w-72 border-r bg-white p-4">
+    <aside className="w-72 flex-shrink-0 border-r bg-white p-4 overflow-y-auto">
       <h2 className="text-lg font-semibold">Nodes</h2>
       <p className="mt-1 text-sm text-slate-500">Drag a block onto canvas.</p>
 
