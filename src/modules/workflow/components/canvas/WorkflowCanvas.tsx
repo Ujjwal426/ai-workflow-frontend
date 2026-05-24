@@ -364,7 +364,8 @@ const WorkflowCanvasInner = () => {
 
     // Call backend execution API
     try {
-      const response = await fetch("http://localhost:8000/api/executions", {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL;
+      const response = await fetch(`${backendUrl}/api/executions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

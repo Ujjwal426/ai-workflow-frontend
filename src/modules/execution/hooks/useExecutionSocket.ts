@@ -50,7 +50,8 @@ export const useExecutionSocket = ({
     }
 
     try {
-      const ws = new WebSocket(`ws://localhost:8000/ws/executions/${workflowId}`);
+      const wsUrl = import.meta.env.VITE_WEBSOCKET_URL;
+      const ws = new WebSocket(`${wsUrl}/ws/executions/${workflowId}`);
       wsRef.current = ws;
 
       ws.onopen = () => {
