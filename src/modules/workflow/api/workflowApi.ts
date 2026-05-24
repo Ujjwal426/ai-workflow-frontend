@@ -10,7 +10,7 @@ import type {
   WorkflowValidation,
 } from "../types/workflow.types";
 
-const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api";
+const API = `${import.meta.env.VITE_BACKEND_URL}/api`;
 
 const workflowClient = axios.create({
   baseURL: API,
